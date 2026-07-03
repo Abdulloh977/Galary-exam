@@ -10,10 +10,15 @@ const JWT_SECRET_KEY = process.env.JWT_SECRET_KEY;
 const authCtrl = {
     signup: async (req, res) => {
         try {
-            const { firstname, lastname, email, password } = req.body;
+            const { username, firstname, lastname, email, password } = req.body;
 
-            if (!firstname || !lastname || !email || !password) {
-                return res.status(400).json({ message: "Please fill all fields!" });
+            if (!username || !firstname || !lastname || !email || !password) {
+                return res.status(400).json({ message: "Please fill all fields, including username!" });
+            }
+
+            const usernameExists = await User.findOne({ username });
+            if (usernameExists) {
+                return res.status(400).json({ message: "This username is already taken!" });
             }
 
             const oldUser = await User.findOne({ email });
@@ -24,6 +29,7 @@ const authCtrl = {
             const hashedPassword = await bcrypt.hash(password, 10);
 
             const newUser = await User.create({
+                username,
                 firstname,
                 lastname,
                 email,
@@ -32,7 +38,7 @@ const authCtrl = {
 
             let { password: userPassword, ...otherDetails } = newUser._doc;
 
-           const token = JWT.sign(
+            const token = JWT.sign(
                 { id: newUser._id, role: newUser.role }, 
                 JWT_SECRET_KEY, 
                 { expiresIn: "30d" }

@@ -1,11 +1,35 @@
 import User from "../model/userModel.js";
-// Rasmlar modeli ochilganda uni mana shu yerda import qilasiz:
-// import Image from "../model/imageModel.js"; 
+import Pin from "../model/pinModel.js";
+import Board from "../model/boardModel.js";
 import bcrypt from "bcrypt";
 import fs from "fs";
 import path from 'path';
 
 const userCtrl = {
+    getProfile: async (req, res) => {
+        try {
+            const { id } = req.params;
+
+            const user = await User.findById(id).select("-password").populate("savedBoards");
+            if (!user) {
+                return res.status(404).json({ message: "User not found!" });
+            }
+
+            const userPins = await Pin.find({ owner: id });
+            const userBoards = await Board.find({ owner: id });
+
+            res.status(200).json({
+                message: "Profile data fetched successfully!",
+                user,
+                pins: userPins,
+                boards: userBoards
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ message: error.message });
+        }
+    },
+
     getAll: async (req, res) => {
         try {
             const users = await User.find().select("-password");
@@ -50,18 +74,16 @@ const userCtrl = {
                     }
                 }
 
-                // 2. GALEREYA UCHUN: Foydalanuvchining yuklagan hamma rasmlarini papkadan o'chirish mantiqi
-                // Bu qism Image modeli tayyor bo'lganda ishlaydi:
-                /*
-                const userImages = await Image.find({ userId: id });
-                userImages.forEach(img => {
-                    const imgPath = path.join('src', 'public', img.imageUrl);
-                    if (fs.existsSync(imgPath)) {
-                        fs.unlinkSync(imgPath);
+                const userPins = await Pin.find({ owner: id });
+                userPins.forEach(pin => {
+                    const pinPath = path.join('src', 'public', pin.imageUrl);
+                    if (fs.existsSync(pinPath)) {
+                        fs.unlinkSync(pinPath);
                     }
                 });
-                await Image.deleteMany({ userId: id }); // Bazadan ham o'chirish
-                */
+
+                await Pin.deleteMany({ owner: id });
+                await Board.deleteMany({ owner: id });
 
                 return res.status(200).json({ message: "User and all gallery data deleted successfully!" });
             } else {
@@ -76,7 +98,7 @@ const userCtrl = {
     updateUser: async (req, res) => {
         try {
             const { id } = req.params;
-            const { firstname, lastname, email, password } = req.body || {};
+            const { firstname, lastname, email, password, username } = req.body || {};
             
             const user = await User.findById(id);
             if (!user) {
@@ -102,6 +124,7 @@ const userCtrl = {
 
             if (firstname) user.firstname = firstname;
             if (lastname) user.lastname = lastname;
+            if (username) user.username = username;
             if (email) user.email = email;
             
             if (password) {

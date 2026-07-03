@@ -10,10 +10,11 @@ import cors from 'cors';
 dotenv.config();
 
 import authRouter from './src/router/authRouter.js';
+import userRouter from './src/router/userRouter.js';
 
 
 const app = express();
-const PORT = process.env.PORT || 4005;
+const PORT = process.env.PORT;
 
 const httpServer = http.createServer(app);
 
@@ -30,6 +31,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(fileUpload());
 
 app.use('/api', authRouter);
+app.use('/api', userRouter);
 
 io.on('connection', (socket) => {
     socket.on('disconnect', () => {});

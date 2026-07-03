@@ -2,42 +2,53 @@ import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema(
     {
+        username: {
+            type: String,
+            required: true,
+            unique: true,
+            trim: true,
+            lowercase: true
+        },
         firstname: {
             type: String,
             required: true,
-            trim: true, 
-            minlength: 3
+            trim: true
         },
         lastname: {
             type: String,
             required: true,
-            trim: true,
-            minlength: 3
+            trim: true
         },
         email: {
             type: String,
             required: true,
-            unique: true, 
+            unique: true,
             lowercase: true,
             trim: true
         },
         password: {
             type: String,
-            required: true,
+            required: true
         },
         role: {
             type: Number,
-            default: 100, 
+            default: 100,
             enum: [100, 101, 102]
         },
         profilePicture: {
             type: String,
-            default: "",
-        }
+            default: ""
+        },
+        savedBoards: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'Board'
+            }
+        ]
     },
     {
-        timestamps: true 
+        timestamps: true
     }
-)
+);
 
 export default mongoose.model('User', userSchema);
