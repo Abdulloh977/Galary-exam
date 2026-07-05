@@ -20,10 +20,8 @@ const pinCtrl = {
             const fileName = `${Date.now()}_${file.name}`;
             const uploadPath = path.join("src", "public", fileName);
 
-            // Rasmni papkaga saqlash
             await file.mv(uploadPath);
 
-            // Teglarni massiv ko'rinishiga o'tkazish (agar matn ko'rinishida kelsa)
             let finalTags = [];
             if (tags) {
                 finalTags = Array.isArray(tags) ? tags : tags.split(",").map(t => t.trim());
@@ -34,7 +32,7 @@ const pinCtrl = {
                 description,
                 imageUrl: fileName,
                 tags: finalTags,
-                owner: req.user.id // authMiddleware'dan kelayotgan user ID
+                owner: req.user.id
             });
 
             res.status(201).json({ message: "Rasm muvaffaqiyatli yuklandi!", pin: newPin });
@@ -43,10 +41,33 @@ const pinCtrl = {
         }
     },
 
+    // Qidiruv — sarlavha (title) yoki teglar (tags) bo'yicha
+    searchPins: async (req, res) => {
+        try {
+            const { query } = req.query;
+
+            if (!query || query.trim() === "") {
+                return res.status(400).json({ message: "Qidiruv so'zi (query) kiritilishi shart!" });
+            }
+
+            const searchRegex = new RegExp(query.trim(), "i");
+
+            const pins = await Pin.find({
+                $or: [
+                    { title: searchRegex },
+                    { tags: searchRegex }
+                ]
+            }).populate("owner", "username firstname lastname profilePicture");
+
+            res.status(200).json({ count: pins.length, pins });
+        } catch (error) {
+            res.status(500).json({ message: error.message });
+        }
+    },
+
     // Barcha rasmlarni olish (Bosh sahifa uchun)
     getAllPins: async (req, res) => {
         try {
-            // Rasmlarni egasi (owner) ma'lumotlari bilan birga tortib keladi
             const pins = await Pin.find().populate("owner", "username firstname lastname profilePicture");
             res.status(200).json({ pins });
         } catch (error) {
@@ -54,17 +75,67 @@ const pinCtrl = {
         }
     },
 
-    // Bitta rasmni to'liq ko'rish (ID bo'yicha)
+    // Bitta rasmni to'liq ko'rish (ID bo'yicha) — har safar ochilganda views +1 bo'ladi
     getOnePin: async (req, res) => {
         try {
             const { id } = req.params;
-            const pin = await Pin.findById(id).populate("owner", "username firstname lastname profilePicture");
+
+            const pin = await Pin.findByIdAndUpdate(
+                id,
+                { $inc: { views: 1 } },
+                { new: true }
+            ).populate("owner", "username firstname lastname profilePicture");
 
             if (!pin) {
                 return res.status(404).json({ message: "Rasm topilmadi!" });
             }
 
             res.status(200).json({ pin });
+        } catch (error) {
+            res.status(500).json({ message: error.message });
+        }
+    },
+
+    // Eng mashhur (Top Popular) rasmlarni olish — views + likes soni bo'yicha saralanadi
+    getTopPins: async (req, res) => {
+        try {
+            const pins = await Pin.aggregate([
+                {
+                    $addFields: {
+                        likesCount: { $size: "$likes" },
+                        popularityScore: { $add: [{ $size: "$likes" }, "$views"] }
+                    }
+                },
+                { $sort: { popularityScore: -1 } },
+                { $limit: 12 },
+                {
+                    $lookup: {
+                        from: "users",
+                        localField: "owner",
+                        foreignField: "_id",
+                        as: "owner"
+                    }
+                },
+                { $unwind: "$owner" },
+                {
+                    $project: {
+                        title: 1,
+                        description: 1,
+                        imageUrl: 1,
+                        tags: 1,
+                        views: 1,
+                        likesCount: 1,
+                        popularityScore: 1,
+                        createdAt: 1,
+                        "owner.username": 1,
+                        "owner.firstname": 1,
+                        "owner.lastname": 1,
+                        "owner.profilePicture": 1
+                    }
+                }
+            ]);
+
+            res.status(200).json({ pins });
         } catch (error) {
             res.status(500).json({ message: error.message });
         }
@@ -81,7 +152,6 @@ const pinCtrl = {
             }
 
             if (pin.owner.toString() === req.user.id || req.userIsAdmin) {
-                // Papkadagi fizik faylni o'chirish
                 const imgPath = path.join("src", "public", pin.imageUrl);
                 if (fs.existsSync(imgPath)) {
                     fs.unlinkSync(imgPath);
@@ -107,14 +177,11 @@ const pinCtrl = {
                 return res.status(404).json({ message: "Rasm topilmadi!" });
             }
 
-            // Foydalanuvchi oldin layk bosganini tekshirish
             const isLiked = pin.likes.includes(req.user.id);
 
             if (isLiked) {
-                // Laykni olib tashlash
                 pin.likes = pin.likes.filter(userId => userId.toString() !== req.user.id);
             } else {
-                // Layk qo'shish
                 pin.likes.push(req.user.id);
             }
 

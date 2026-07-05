@@ -10,6 +10,12 @@ router.post('/pin/create', authMiddleware, pinCtrl.createPin);
 // Barcha rasmlarni olish — token kerak emas
 router.get('/pin/all', pinCtrl.getAllPins);
 
+// Eng mashhur (Top Popular) rasmlar — MUHIM: /pin/one/:id dan OLDIN yozilishi shart!
+router.get('/pin/top', pinCtrl.getTopPins);
+
+// Qidiruv — sarlavha yoki teglar bo'yicha — MUHIM: /pin/one/:id dan OLDIN yozilishi shart!
+router.get('/pin/search', pinCtrl.searchPins);
+
 // Bitta rasmni ko'rish — token kerak emas
 router.get('/pin/one/:id', pinCtrl.getOnePin);
 
