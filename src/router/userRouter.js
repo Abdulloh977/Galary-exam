@@ -11,4 +11,4 @@ router.delete('/delete/:id', authMiddleware, userCtrl.deleteUser);
 router.put('/update/:id', authMiddleware,  userCtrl.updateUser);
 
 
-export default router;
+export default router;  

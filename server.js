@@ -41,7 +41,7 @@ app.use('/api', boardRouter);
 app.use('/api', commentRouter);
 
 io.on('connection', (socket) => {
-    socket.on('disconnect', () => {});
+    socket.on('disconnect', () => { });
 });
 
 const MONGO_URL = process.env.MONGO_URL;
