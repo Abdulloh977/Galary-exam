@@ -14,6 +14,8 @@ import userRouter from './src/router/userRouter.js';
 import pinRouter from './src/router/pinRouter.js';
 import boardRouter from './src/router/boardRouter.js';
 import commentRouter from './src/router/commentRouter.js';
+import chatRouter from './src/router/chatRouter.js';
+import Chat from './src/model/chatModel.js';
 
 
 const app = express();
@@ -39,9 +41,49 @@ app.use('/api', userRouter);
 app.use('/api', pinRouter);
 app.use('/api', boardRouter);
 app.use('/api', commentRouter);
+app.use('/api', chatRouter);
+
+// Onlayn foydalanuvchilarni saqlab turish uchun: { userId: socketId }
+const onlineUsers = new Map();
 
 io.on('connection', (socket) => {
-    socket.on('disconnect', () => { });
+    // Foydalanuvchi saytga kirganda, o'z ID'sini socket bilan bog'laydi
+    socket.on('addUser', (userId) => {
+        onlineUsers.set(userId, socket.id);
+    });
+
+    // Yangi xabar yuborilganda
+    socket.on('sendMessage', async ({ senderId, receiverId, text }) => {
+        try {
+            // Xabarni ma'lumotlar bazasiga saqlaymiz
+            const newMessage = await Chat.create({
+                sender: senderId,
+                receiver: receiverId,
+                text
+            });
+
+            // Agar qabul qiluvchi hozir onlayn bo'lsa — unga real vaqtda yuboramiz
+            const receiverSocketId = onlineUsers.get(receiverId);
+            if (receiverSocketId) {
+                io.to(receiverSocketId).emit('getMessage', newMessage);
+            }
+
+            // Yuboruvchiga ham tasdiq sifatida qaytarib beramiz
+            socket.emit('messageSent', newMessage);
+        } catch (error) {
+            socket.emit('messageError', { message: error.message });
+        }
+    });
+
+    socket.on('disconnect', () => {
+        // Uzilgan foydalanuvchini ro'yxatdan olib tashlaymiz
+        for (const [userId, socketId] of onlineUsers.entries()) {
+            if (socketId === socket.id) {
+                onlineUsers.delete(userId);
+                break;
+            }
+        }
+    });
 });
 
 const MONGO_URL = process.env.MONGO_URL;
