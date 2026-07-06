@@ -3,7 +3,6 @@ import fs from "fs";
 import path from "path";
 
 const pinCtrl = {
-    // Yangi Pin (Rasm) yuklash
     createPin: async (req, res) => {
         try {
             const { title, description, tags } = req.body;
@@ -20,10 +19,10 @@ const pinCtrl = {
             const fileName = `${Date.now()}_${file.name}`;
             const uploadPath = path.join("src", "public", fileName);
 
-            // Rasmni papkaga saqlash
+            
             await file.mv(uploadPath);
 
-            // Teglarni massiv ko'rinishiga o'tkazish (agar matn ko'rinishida kelsa)
+            
             let finalTags = [];
             if (tags) {
                 finalTags = Array.isArray(tags) ? tags : tags.split(",").map(t => t.trim());
@@ -34,7 +33,7 @@ const pinCtrl = {
                 description,
                 imageUrl: fileName,
                 tags: finalTags,
-                owner: req.user.id // authMiddleware'dan kelayotgan user ID
+                owner: req.user.id 
             });
 
             res.status(201).json({ message: "Rasm muvaffaqiyatli yuklandi!", pin: newPin });
@@ -43,10 +42,8 @@ const pinCtrl = {
         }
     },
 
-    // Barcha rasmlarni olish (Bosh sahifa uchun)
     getAllPins: async (req, res) => {
         try {
-            // Rasmlarni egasi (owner) ma'lumotlari bilan birga tortib keladi
             const pins = await Pin.find().populate("owner", "username firstname lastname profilePicture");
             res.status(200).json({ pins });
         } catch (error) {
@@ -54,7 +51,6 @@ const pinCtrl = {
         }
     },
 
-    // Bitta rasmni to'liq ko'rish (ID bo'yicha)
     getOnePin: async (req, res) => {
         try {
             const { id } = req.params;
@@ -70,7 +66,6 @@ const pinCtrl = {
         }
     },
 
-    // Rasmni o'chirish (Faqat egasi yoki admin o'chira oladi)
     deletePin: async (req, res) => {
         try {
             const { id } = req.params;
@@ -81,7 +76,6 @@ const pinCtrl = {
             }
 
             if (pin.owner.toString() === req.user.id || req.userIsAdmin) {
-                // Papkadagi fizik faylni o'chirish
                 const imgPath = path.join("src", "public", pin.imageUrl);
                 if (fs.existsSync(imgPath)) {
                     fs.unlinkSync(imgPath);
@@ -97,7 +91,6 @@ const pinCtrl = {
         }
     },
 
-    // Layk bosish va qaytarib olish (Toggle Like)
     likePin: async (req, res) => {
         try {
             const { id } = req.params;
@@ -107,14 +100,11 @@ const pinCtrl = {
                 return res.status(404).json({ message: "Rasm topilmadi!" });
             }
 
-            // Foydalanuvchi oldin layk bosganini tekshirish
             const isLiked = pin.likes.includes(req.user.id);
 
             if (isLiked) {
-                // Laykni olib tashlash
                 pin.likes = pin.likes.filter(userId => userId.toString() !== req.user.id);
             } else {
-                // Layk qo'shish
                 pin.likes.push(req.user.id);
             }
 
