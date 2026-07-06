@@ -1,25 +1,6 @@
 import Chat from "../model/chatModel.js";
 
 const chatCtrl = {
-    // Ikki foydalanuvchi orasidagi suhbat tarixini olish
-    getConversation: async (req, res) => {
-        try {
-            const myId = req.user.id;
-            const { userId } = req.params;
-
-            const messages = await Chat.find({
-                $or: [
-                    { sender: myId, receiver: userId },
-                    { sender: userId, receiver: myId }
-                ]
-            }).sort({ createdAt: 1 });
-
-            res.status(200).json({ messages });
-        } catch (error) {
-            res.status(500).json({ message: error.message });
-        }
-    },
-
     // Xabar yuborish (REST orqali, zaxira sifatida — asosiysi Socket.io orqali ishlaydi)
     sendMessage: async (req, res) => {
         try {
@@ -40,6 +21,26 @@ const chatCtrl = {
             res.status(500).json({ message: error.message });
         }
     },
+    
+    // Ikki foydalanuvchi orasidagi suhbat tarixini olish
+    getConversation: async (req, res) => {
+        try {
+            const myId = req.user.id;
+            const { userId } = req.params;
+
+            const messages = await Chat.find({
+                $or: [
+                    { sender: myId, receiver: userId },
+                    { sender: userId, receiver: myId }
+                ]
+            }).sort({ createdAt: 1 });
+
+            res.status(200).json({ messages });
+        } catch (error) {
+            res.status(500).json({ message: error.message });
+        }
+    },
+
 
     // Foydalanuvchining barcha suhbatdoshlari ro'yxati (chap paneldagi chat ro'yxati uchun)
     getConversationsList: async (req, res) => {
