@@ -4,16 +4,16 @@ import authMiddleware from '../authMiddleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Yangi doska (board) yaratish — token kerak
+// Yangi board yaratish — token kerak
 router.post('/board/create', authMiddleware, boardCtrl.createBoard);
 
-// Bitta doskani ichidagi rasmlari bilan ko'rish — token kerak emas
+// Bitta boardni ichidagi rasmlari bilan ko'rish — token kerak emas
 router.get('/board/one/:id', boardCtrl.getOneBoard);
 
-// Doskaga rasm qo'shish / olib tashlash — token kerak
+// Boardga rasm qo'shish / olib tashlash — token kerak
 router.put('/board/addPin', authMiddleware, boardCtrl.addPinToBoard);
 
-// Boshqa foydalanuvchining doskasini o'ziga saqlab qo'yish — token kerak
+// Boshqa foydalanuvchining boardni o'ziga saqlab qo'yish — token kerak
 router.put('/board/save/:boardId', authMiddleware, boardCtrl.saveBoardToUser);
 
 export default router;

@@ -7,7 +7,7 @@ const boardCtrl = {
         try {
             const { title } = req.body;
             if (!title) {
-                return res.status(400).json({ message: "Doska nomi (title) majburiy!" });
+                return res.status(400).json({ message: "Board nomi (title) majburiy!" });
             }
 
             const newBoard = await Board.create({
@@ -15,20 +15,20 @@ const boardCtrl = {
                 owner: req.user.id
             });
 
-            res.status(201).json({ message: "Doska muvaffaqiyatli yaratildi!", board: newBoard });
+            res.status(201).json({ message: "Board muvaffaqiyatli yaratildi!", board: newBoard });
         } catch (error) {
             res.status(500).json({ message: error.message });
         }
     },
 
-    // Bitta doskani ichidagi barcha Pin (rasm)lari bilan birga ko'rish
+    // Bitta doska ichidagi barcha Pin (rasm)lari bilan birga ko'rish
     getOneBoard: async (req, res) => {
         try {
             const { id } = req.params;
             const board = await Board.findById(id).populate("pins");
 
             if (!board) {
-                return res.status(404).json({ message: "Doska topilmadi!" });
+                return res.status(404).json({ message: "Board topilmadi!" });
             }
 
             res.status(200).json({ board });
@@ -43,10 +43,10 @@ const boardCtrl = {
             const { boardId, pinId } = req.body;
 
             const board = await Board.findById(boardId);
-            if (!board) return res.status(404).json({ message: "Doska topilmadi!" });
+            if (!board) return res.status(404).json({ message: "Board topilmadi!" });
 
             if (board.owner.toString() !== req.user.id) {
-                return res.status(403).json({ message: "Bu doska sizga tegishli emas!" });
+                return res.status(403).json({ message: "Bu board sizga tegishli emas!" });
             }
 
             const pinExists = board.pins.includes(pinId);
@@ -58,7 +58,7 @@ const boardCtrl = {
             }
 
             await board.save();
-            res.status(200).json({ message: pinExists ? "Rasm doskadan olib tashlandi" : "Rasm doskaga qo'shildi", board });
+            res.status(200).json({ message: pinExists ? "Rasm boarddan olib tashlandi" : "Rasm boardga qo'shildi", board });
         } catch (error) {
             res.status(500).json({ message: error.message });
         }
@@ -79,7 +79,7 @@ const boardCtrl = {
             }
 
             await user.save();
-            res.status(200).json({ message: isSaved ? "Doska saqlanganlardan olib tashlandi" : "Doska profilga saqlab qo'yildi" });
+            res.status(200).json({ message: isSaved ? "Board saqlanganlardan olib tashlandi" : "Board profilga saqlab qo'yildi" });
         } catch (error) {
             res.status(500).json({ message: error.message });
         }
