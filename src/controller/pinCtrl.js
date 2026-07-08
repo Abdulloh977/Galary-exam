@@ -3,7 +3,6 @@ import fs from "fs";
 import path from "path";
 
 const pinCtrl = {
-    // Yangi Pin (Rasm) yuklash
     createPin: async (req, res) => {
         try {
             const { title, description, tags } = req.body;
@@ -20,6 +19,10 @@ const pinCtrl = {
             const fileName = `${Date.now()}_${file.name}`;
             const uploadPath = path.join("src", "public", fileName);
 
+            
+            await file.mv(uploadPath);
+
+            
             await file.mv(uploadPath);
 
             let finalTags = [];
@@ -32,7 +35,8 @@ const pinCtrl = {
                 description,
                 imageUrl: fileName,
                 tags: finalTags,
-                owner: req.user.id
+                owner: req.user.id 
+                // owner: req.user.id
             });
 
             res.status(201).json({ message: "Rasm muvaffaqiyatli yuklandi!", pin: newPin });
@@ -167,7 +171,6 @@ const pinCtrl = {
         }
     },
 
-    // Layk bosish va qaytarib olish (Toggle Like)
     likePin: async (req, res) => {
         try {
             const { id } = req.params;
