@@ -21,6 +21,16 @@ const boardCtrl = {
         }
     },
 
+    // Foydalanuvchining o'ziga tegishli barcha doskalarini olish
+    getMyBoards: async (req, res) => {
+        try {
+            const boards = await Board.find({ owner: req.user.id }).populate("pins");
+            res.status(200).json({ boards });
+        } catch (error) {
+            res.status(500).json({ message: error.message });
+        }
+    },
+
     // Bitta doska ichidagi barcha Pin (rasm)lari bilan birga ko'rish
     getOneBoard: async (req, res) => {
         try {
@@ -32,6 +42,51 @@ const boardCtrl = {
             }
 
             res.status(200).json({ board });
+        } catch (error) {
+            res.status(500).json({ message: error.message });
+        }
+    },
+
+    // Doska nomini yangilash (Update)
+    updateBoard: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { title } = req.body;
+
+            const board = await Board.findById(id);
+            if (!board) return res.status(404).json({ message: "Board topilmadi!" });
+
+            if (board.owner.toString() !== req.user.id) {
+                return res.status(403).json({ message: "Bu board sizga tegishli emas!" });
+            }
+
+            if (!title || title.trim() === "") {
+                return res.status(400).json({ message: "Board nomi bo'sh bo'lmasligi kerak!" });
+            }
+
+            board.title = title.trim();
+            await board.save();
+
+            res.status(200).json({ message: "Board nomi yangilandi!", board });
+        } catch (error) {
+            res.status(500).json({ message: error.message });
+        }
+    },
+
+    // Doskani o'chirish (Delete) — ichidagi pinlar o'chmaydi, faqat doskaning o'zi o'chadi
+    deleteBoard: async (req, res) => {
+        try {
+            const { id } = req.params;
+
+            const board = await Board.findById(id);
+            if (!board) return res.status(404).json({ message: "Board topilmadi!" });
+
+            if (board.owner.toString() !== req.user.id) {
+                return res.status(403).json({ message: "Bu board sizga tegishli emas!" });
+            }
+
+            await Board.findByIdAndDelete(id);
+            res.status(200).json({ message: "Board muvaffaqiyatli o'chirildi!" });
         } catch (error) {
             res.status(500).json({ message: error.message });
         }
