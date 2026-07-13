@@ -9,7 +9,7 @@ dotenv.config();
 
 const JWT_SECRET_KEY = process.env.JWT_SECRET_KEY;
 // Google Cloud orqali olgan Client ID kodingizni .env fayliga yozib qo'ying
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+// const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const authCtrl = {
     signup: async (req, res) => {
