@@ -1,0 +1,153 @@
+import User from "../model/userModel.js";
+import bcrypt from "bcrypt";
+import JWT from 'jsonwebtoken';
+import dotenv from 'dotenv';
+// Google tokenni tekshirish uchun rasmiy kutubxona
+import { OAuth2Client } from 'google-auth-library';
+
+dotenv.config();
+
+const JWT_SECRET_KEY = process.env.JWT_SECRET_KEY;
+// Google Cloud orqali olgan Client ID kodingizni .env fayliga yozib qo'ying
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+const authCtrl = {
+    signup: async (req, res) => {
+        try {
+            const { username, firstname, lastname, email, password } = req.body;
+
+            if (!username || !firstname || !lastname || !email || !password) {
+                return res.status(400).json({ message: "Please fill all fields, including username!" });
+            }
+
+            const usernameExists = await User.findOne({ username });
+            if (usernameExists) {
+                return res.status(400).json({ message: "This username is already taken!" });
+            }
+
+            const oldUser = await User.findOne({ email });
+            if (oldUser) {
+                return res.status(400).json({ message: "This email is already registered!" });
+            }
+
+            const hashedPassword = await bcrypt.hash(password, 10);
+
+            const newUser = await User.create({
+                username,
+                firstname,
+                lastname,
+                email,
+                password: hashedPassword
+            });
+
+            let { password: userPassword, ...otherDetails } = newUser._doc;
+
+            const token = JWT.sign(
+                { id: newUser._id, role: newUser.role }, 
+                JWT_SECRET_KEY, 
+                { expiresIn: "30d" }
+            );
+
+            res.status(201).json({ message: "Signup success!", user: otherDetails, token });
+
+        } catch (error) {
+            console.error("Signup Error:", error);
+            res.status(500).json({ message: error.message });
+        }
+    },
+
+    login: async (req, res) => {
+        try {
+            const { email, password } = req.body;
+
+            if (!email || !password) {
+                return res.status(400).json({ message: "Please fill all fields!" });
+            }
+
+            const user = await User.findOne({ email });
+            if (!user) {
+                return res.status(400).json({ message: "Login or password is wrong!" });
+            }
+
+           const verifyPassword = await bcrypt.compare(password, user.password);
+            if (!verifyPassword) {
+                return res.status(400).json({ message: "Login or password is wrong!" });
+            }
+
+            let { password: userPassword, ...otherDetails } = user._doc;
+
+            const token = JWT.sign(
+                { id: user._id, role: user.role }, 
+                JWT_SECRET_KEY, 
+                { expiresIn: "30d" }
+            );
+
+            res.status(200).json({ message: "Login success!", user: otherDetails, token });
+
+        } catch (error) {
+            console.error("Login Error:", error);
+            res.status(500).json({ message: error.message });
+        }
+    },
+
+    // SIZ SO'RAGAN YANGI GOOGLE LOGIN/REGISTER FUNKSIYASI
+    googleLogin: async (req, res) => {
+        try {
+            const { token } = req.body;
+
+            if (!token) {
+                return res.status(400).json({ message: "Google token topilmadi!" });
+            }
+
+            // Frontenddan kelgan Google tokenni Google serveri orqali tekshiramiz
+            const ticket = await client.verifyIdToken({
+                idToken: token,
+                audience: process.env.GOOGLE_CLIENT_ID,
+            });
+            
+            const payload = ticket.getPayload();
+            const { email, given_name, family_name } = payload;
+
+            // Bazada bunday email bor-yo'qligini tekshiramiz
+            let user = await User.findOne({ email });
+
+            // Agar bazada yo'q bo'lsa, avtomatik srazi ro'yxatdan o'tkazamiz
+            if (!user) {
+                // Email nomidan va tasodifiy sondan username yasaymiz
+                const generatedUsername = email.split('@')[0] + Math.floor(Math.random() * 100);
+                // Tasodifiy qiyin parol generatsiya qilamiz
+                const generatedPassword = Math.random().toString(36).slice(-10);
+                const hashedPassword = await bcrypt.hash(generatedPassword, 10);
+
+                user = await User.create({
+                    username: generatedUsername,
+                    firstname: given_name || "Google",
+                    lastname: family_name || "User",
+                    email: email,
+                    password: hashedPassword
+                });
+            }
+
+            // Foydalanuvchiga o'zingizning JWT tokeningizni berasiz
+            const myToken = JWT.sign(
+                { id: user._id, role: user.role }, 
+                JWT_SECRET_KEY, 
+                { expiresIn: "30d" }
+            );
+
+            let { password: userPassword, ...otherDetails } = user._doc;
+
+            res.status(200).json({ 
+                message: "Google orqali kirish muvaffaqiyatli!", 
+                user: otherDetails, 
+                token: myToken 
+            });
+
+        } catch (error) {
+            console.error("Google Login Error:", error);
+            res.status(500).json({ message: "Google orqali autentifikatsiyadan o'tishda xatolik!" });
+        }
+    }
+};
+
+export default authCtrl;
