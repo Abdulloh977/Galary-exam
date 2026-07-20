@@ -1,6 +1,7 @@
 import User from "../model/userModel.js";
 import Pin from "../model/pinModel.js";
 import Board from "../model/boardModel.js";
+import Comment from "../model/commentModel.js";
 import bcrypt from "bcrypt";
 import fs from "fs";
 import path from 'path';
@@ -75,12 +76,25 @@ const userCtrl = {
                 }
 
                 const userPins = await Pin.find({ owner: id });
+                const pinIds = userPins.map(pin => pin._id);
+
                 userPins.forEach(pin => {
                     const pinPath = path.join('src', 'public', pin.imageUrl);
                     if (fs.existsSync(pinPath)) {
                         fs.unlinkSync(pinPath);
                     }
                 });
+
+                // Foydalanuvchining o'z rasmlariga yozilgan barcha izohlar (boshqalarniki ham)
+                await Comment.deleteMany({ pin: { $in: pinIds } });
+                // Foydalanuvchining o'zi boshqa rasmlarga yozgan izohlari
+                await Comment.deleteMany({ user: id });
+
+                // O'chirilgan rasmlarni boshqa userlarning category (board)laridan ham olib tashlaymiz
+                await Board.updateMany({ pins: { $in: pinIds } }, { $pull: { pins: { $in: pinIds } } });
+
+                // Foydalanuvchi boshqa rasmlarga bosgan layklarni ham tozalaymiz
+                await Pin.updateMany({ likes: id }, { $pull: { likes: id } });
 
                 await Pin.deleteMany({ owner: id });
                 await Board.deleteMany({ owner: id });
@@ -107,8 +121,19 @@ const userCtrl = {
 
             if (req.files && req.files.profilePicture) {
                 const file = req.files.profilePicture;
-                
-                const fileName = `${Date.now()}_${file.name}`;
+
+                // Rasm nomi kirill/bo'shliq bo'lsa brauzer so'rovi bloklanishi mumkin edi —
+                // shuning uchun fayl nomini lotin/raqamli xavfsiz shaklga o'tkazamiz
+                const ext = path.extname(file.name);
+                const baseName = path.basename(file.name, ext)
+                    .normalize("NFKD")
+                    .replace(/[\u0300-\u036f]/g, "")
+                    .replace(/[^a-zA-Z0-9_-]+/g, "-")
+                    .replace(/-+/g, "-")
+                    .replace(/^-|-$/g, "");
+                const safeName = baseName ? `${baseName}${ext}` : `avatar${ext}`;
+
+                const fileName = `${Date.now()}_${safeName}`;
                 const uploadPath = path.join('src', 'public', fileName);
 
                 if (user.profilePicture && user.profilePicture !== '') {

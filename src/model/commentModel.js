@@ -16,6 +16,12 @@ const commentSchema = new mongoose.Schema(
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User', 
             required: true
+        },
+        // Agar bu izoh boshqa izohga javob bo'lsa, o'sha izohning ID'si shu yerda saqlanadi
+        parentComment: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Comment',
+            default: null
         }
     },
     {
