@@ -46,8 +46,7 @@ const pinCtrl = {
                 description,
                 imageUrl: fileName,
                 tags: finalTags,
-                owner: req.user.id 
-                // owner: req.user.id
+                owner: req.user.id
             });
 
             res.status(201).json({ message: "Rasm muvaffaqiyatli yuklandi!", pin: newPin });
@@ -139,6 +138,7 @@ const pinCtrl = {
                         imageUrl: 1,
                         tags: 1,
                         views: 1,
+                        likes: 1,
                         likesCount: 1,
                         popularityScore: 1,
                         createdAt: 1,
