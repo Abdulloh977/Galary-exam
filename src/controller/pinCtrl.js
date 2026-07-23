@@ -18,20 +18,7 @@ const pinCtrl = {
             }
 
             const file = req.files.image;
-
-            // Fayl nomida kirill harflar yoki bo'shliq bo'lsa, brauzer so'rovni
-            // to'g'ri yubora olmasligi (ERR_BLOCKED_BY_CLIENT/404) mumkin edi.
-            // Shuning uchun faqat lotin harf/raqam/tire/pastki chiziqni qoldiramiz.
-            const ext = path.extname(file.name);
-            const baseName = path.basename(file.name, ext)
-                .normalize("NFKD")
-                .replace(/[\u0300-\u036f]/g, "") // diakritik belgilarni olib tashlash
-                .replace(/[^a-zA-Z0-9_-]+/g, "-") // lotin bo'lmagan (kirill va h.k.) belgilarni "-" bilan almashtirish
-                .replace(/-+/g, "-")
-                .replace(/^-|-$/g, "");
-
-            const safeName = baseName ? `${baseName}${ext}` : `image${ext}`;
-            const fileName = `${Date.now()}_${safeName}`;
+            const fileName = `${Date.now()}_${file.name}`;
             const uploadPath = path.join("src", "public", fileName);
 
             await file.mv(uploadPath);
@@ -46,8 +33,11 @@ const pinCtrl = {
                 description,
                 imageUrl: fileName,
                 tags: finalTags,
+<<<<<<< HEAD
                 owner: req.user.id 
-                // owner: req.user.id
+=======
+                owner: req.user.id
+>>>>>>> 16af8b1cada0f6588fd967d89bdb512de81c2b7c
             });
 
             res.status(201).json({ message: "Rasm muvaffaqiyatli yuklandi!", pin: newPin });
@@ -80,17 +70,19 @@ const pinCtrl = {
         }
     },
 
-    // Barcha rasmlarni olish (Bosh sahifa uchun)
+    // 1. YANGILANDI: Barcha rasmlarni olish (isPrivate true bo'lganlarini lentadan yashiradi)
     getAllPins: async (req, res) => {
         try {
-            const pins = await Pin.find().populate("owner", "username firstname lastname profilePicture");
+            // isPrivate maydoni true bo'lmagan (ya'ni false yoki umuman yo'q) pinlarni topadi
+            const pins = await Pin.find({ isPrivate: { $ne: true } })
+                .populate("owner", "username firstname lastname profilePicture");
             res.status(200).json({ pins });
         } catch (error) {
             res.status(500).json({ message: error.message });
         }
     },
 
-    // Bitta rasmni to'liq ko'rish (ID bo'yicha) — har safar ochilganda views +1 bo'ladi
+    // Bitta rasmni to'liq ko'rish (ID bo'yicha)
     getOnePin: async (req, res) => {
         try {
             const { id } = req.params;
@@ -111,10 +103,14 @@ const pinCtrl = {
         }
     },
 
-    // Eng mashhur (Top Popular) rasmlarni olish — views + likes soni bo'yicha saralanadi
+    // 2. YANGILANDI: Top rasmlarni olishda ham yashirin rasmlar chiqmaydi
     getTopPins: async (req, res) => {
         try {
             const pins = await Pin.aggregate([
+                {
+                    // Aggregation boshlanishida isPrivate true bo'lganlarini o'tkazib yuboramiz
+                    $match: { isPrivate: { $ne: true } }
+                },
                 {
                     $addFields: {
                         likesCount: { $size: "$likes" },
@@ -139,6 +135,7 @@ const pinCtrl = {
                         imageUrl: 1,
                         tags: 1,
                         views: 1,
+                        likes: 1,
                         likesCount: 1,
                         popularityScore: 1,
                         createdAt: 1,
@@ -156,7 +153,7 @@ const pinCtrl = {
         }
     },
 
-    // Rasmni o'chirish (Faqat egasi yoki admin o'chira oladi)
+    // Rasmni o'chirish
     deletePin: async (req, res) => {
         try {
             const { id } = req.params;
@@ -173,13 +170,6 @@ const pinCtrl = {
                 }
 
                 await Pin.findByIdAndDelete(id);
-
-                // Rasm o'chirilganda unga tegishli barcha izohlar ham o'chadi
-                await Comment.deleteMany({ pin: id });
-
-                // Rasm o'chirilganda barcha category (board)lardan ham olib tashlanadi
-                await Board.updateMany({ pins: id }, { $pull: { pins: id } });
-
                 return res.status(200).json({ message: "Rasm muvaffaqiyatli o'chirildi!" });
             } else {
                 return res.status(403).json({ message: "Sizda bu rasmni o'chirish huquqi yo'q!" });
@@ -189,6 +179,7 @@ const pinCtrl = {
         }
     },
 
+    // Layk bosish logikasi
     likePin: async (req, res) => {
         try {
             const { id } = req.params;
@@ -208,6 +199,33 @@ const pinCtrl = {
 
             await pin.save();
             res.status(200).json({ message: isLiked ? "Layk olib tashlandi" : "Layk bosildi", likesCount: pin.likes.length });
+        } catch (error) {
+            res.status(500).json({ message: error.message });
+        }
+    },
+
+    // 3. YANGI QO'SHILDI: Frontend'dagi checkbox bosilganda maxfiylikni saqlaydigan funksiya
+    updatePin: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { isPrivate } = req.body; // true yoki false qiymat keladi
+
+            const pin = await Pin.findById(id);
+
+            if (!pin) {
+                return res.status(404).json({ message: "Rasm topilmadi!" });
+            }
+
+            // Faqat rasm egasi holatni o'zgartira olishi uchun tekshirish
+            if (pin.owner.toString() !== req.user.id) {
+                return res.status(403).json({ message: "Sizda bu rasmni yashirish huquqi yo'q!" });
+            }
+
+            // isPrivate qiymatini yangilaymiz
+            pin.isPrivate = isPrivate;
+            await pin.save();
+
+            res.status(200).json({ message: "Rasm holati muvaffaqiyatli yangilandi", pin });
         } catch (error) {
             res.status(500).json({ message: error.message });
         }
