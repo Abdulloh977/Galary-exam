@@ -18,7 +18,28 @@ const pinCtrl = {
             }
 
             const file = req.files.image;
-            const fileName = `${Date.now()}_${file.name}`;
+
+<<<<<<< HEAD
+            // Fayl nomida kirill harflar yoki bo'shliq bo'lsa, brauzer so'rovni
+            // to'g'ri yubora olmasligi (ERR_BLOCKED_BY_CLIENT/404) mumkin edi.
+            // Shuning uchun faqat lotin harf/raqam/tire/pastki chiziqni qoldiramiz.
+            const ext = path.extname(file.name);
+            const baseName = path.basename(file.name, ext)
+                .normalize("NFKD")
+                .replace(/[\u0300-\u036f]/g, "") // diakritik belgilarni olib tashlash
+                .replace(/[^a-zA-Z0-9_-]+/g, "-") // lotin bo'lmagan (kirill va h.k.) belgilarni "-" bilan almashtirish
+=======
+            const ext = path.extname(file.name);
+            const baseName = path.basename(file.name, ext)
+                .normalize("NFKD")
+                .replace(/[\u0300-\u036f]/g, "") 
+                .replace(/[^a-zA-Z0-9_-]+/g, "-") 
+>>>>>>> 333512382f5096887a931aff4417694b2df2bc64
+                .replace(/-+/g, "-")
+                .replace(/^-|-$/g, "");
+
+            const safeName = baseName ? `${baseName}${ext}` : `image${ext}`;
+            const fileName = `${Date.now()}_${safeName}`;
             const uploadPath = path.join("src", "public", fileName);
 
             await file.mv(uploadPath);
@@ -170,6 +191,17 @@ const pinCtrl = {
                 }
 
                 await Pin.findByIdAndDelete(id);
+<<<<<<< HEAD
+
+                // Rasm o'chirilganda unga tegishli barcha izohlar ham o'chadi
+                await Comment.deleteMany({ pin: id });
+
+                // Rasm o'chirilganda barcha category (board)lardan ham olib tashlanadi
+=======
+                await Comment.deleteMany({ pin: id });
+>>>>>>> 333512382f5096887a931aff4417694b2df2bc64
+                await Board.updateMany({ pins: id }, { $pull: { pins: id } });
+
                 return res.status(200).json({ message: "Rasm muvaffaqiyatli o'chirildi!" });
             } else {
                 return res.status(403).json({ message: "Sizda bu rasmni o'chirish huquqi yo'q!" });
