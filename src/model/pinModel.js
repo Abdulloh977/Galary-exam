@@ -36,6 +36,10 @@ const pinSchema = new mongoose.Schema(
         views: {
             type: Number,
             default: 0
+        },
+        isPrivate: {
+            type: Boolean,
+            default: false
         }
     },
     {
