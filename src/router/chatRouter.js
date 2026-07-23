@@ -13,4 +13,10 @@ router.get('/chat/:userId', authMiddleware, chatCtrl.getConversation);
 // Xabar yuborish (REST orqali)
 router.post('/chat/send', authMiddleware, chatCtrl.sendMessage);
 
+// Rasm orqali xabar yuborish
+router.post('/chat/send-image', authMiddleware, chatCtrl.sendImageMessage);
+
+// Xabarni o'chirish
+router.delete('/chat/message/:id', authMiddleware, chatCtrl.deleteMessage);
+
 export default router;

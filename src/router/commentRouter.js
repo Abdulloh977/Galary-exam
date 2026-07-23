@@ -10,4 +10,6 @@ router.get('/comment/pin/:pinId', commentCtrl.getPinComments);
 
 router.delete('/comment/delete/:id', authMiddleware, commentCtrl.deleteComment);
 
+router.put('/comment/update/:id', authMiddleware, commentCtrl.updateComment);
+
 export default router;

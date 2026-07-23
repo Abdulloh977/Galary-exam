@@ -14,8 +14,12 @@ const chatSchema = new mongoose.Schema(
         },
         text: {
             type: String,
-            required: true,
-            trim: true
+            trim: true,
+            default: ""
+        },
+        imageUrl: {
+            type: String,
+            default: ""
         },
         seen: {
             type: Boolean,
