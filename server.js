@@ -15,7 +15,9 @@ import pinRouter from './src/router/pinRouter.js';
 import boardRouter from './src/router/boardRouter.js';
 import commentRouter from './src/router/commentRouter.js';
 import chatRouter from './src/router/chatRouter.js';
+import contactRouter from './src/router/contactRouter.js';
 import Chat from './src/model/chatModel.js';
+import User from './src/model/userModel.js';
 
 
 const app = express();
@@ -42,19 +44,45 @@ app.use('/api', pinRouter);
 app.use('/api', boardRouter);
 app.use('/api', commentRouter);
 app.use('/api', chatRouter);
+app.use('/api', contactRouter);
 
 // Onlayn foydalanuvchilarni saqlab turish uchun: { userId: socketId }
 const onlineUsers = new Map();
+
+// REST controllerlar ham (masalan rasm xabar yuborilganda) real vaqtda
+// signal yubora olishi uchun io va onlineUsers'ni app orqali ulashamiz
+app.set("io", io);
+app.set("onlineUsers", onlineUsers);
+
+const broadcastOnlineUsers = () => {
+    io.emit("onlineUsers", Array.from(onlineUsers.keys()));
+};
 
 io.on('connection', (socket) => {
     // Foydalanuvchi saytga kirganda, o'z ID'sini socket bilan bog'laydi
     socket.on('addUser', (userId) => {
         onlineUsers.set(userId, socket.id);
+        socket.userId = userId;
+        broadcastOnlineUsers();
     });
 
     // Yangi xabar yuborilganda
     socket.on('sendMessage', async ({ senderId, receiverId, text }) => {
         try {
+            // Ikki tomonlama bloklashni tekshiramiz — bloklangan bo'lsa xabar yuborilmaydi
+            const [sender, receiver] = await Promise.all([
+                User.findById(senderId).select("blockedUsers"),
+                User.findById(receiverId).select("blockedUsers")
+            ]);
+
+            const isBlocked =
+                (sender && sender.blockedUsers.some(id => id.toString() === receiverId)) ||
+                (receiver && receiver.blockedUsers.some(id => id.toString() === senderId));
+
+            if (isBlocked) {
+                return socket.emit('messageError', { message: "Xabar yuborib bo'lmaydi — bloklangan!" });
+            }
+
             // Xabarni ma'lumotlar bazasiga saqlaymiz
             const newMessage = await Chat.create({
                 sender: senderId,
@@ -75,14 +103,75 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('disconnect', () => {
+    // Suhbat ochilganda, qarshi tomonning xabarlari "ko'rildi" deb belgilanadi
+    socket.on('markSeen', async ({ viewerId, otherUserId }) => {
+        try {
+            await Chat.updateMany(
+                { sender: otherUserId, receiver: viewerId, seen: false },
+                { $set: { seen: true } }
+            );
+
+            const otherSocketId = onlineUsers.get(otherUserId);
+            if (otherSocketId) {
+                io.to(otherSocketId).emit('messagesSeen', { by: viewerId });
+            }
+        } catch (error) {
+            console.error("markSeen xatosi:", error.message);
+        }
+    });
+
+    // --- Ovozli / videoqo'ng'iroq signalizatsiyasi (WebRTC, oddiy peer-to-peer) ---
+    socket.on('callUser', ({ to, from, offer, callType, callerInfo }) => {
+        const targetSocketId = onlineUsers.get(to);
+        if (targetSocketId) {
+            io.to(targetSocketId).emit('incomingCall', { from, offer, callType, callerInfo });
+        } else {
+            socket.emit('callFailed', { reason: 'offline' });
+        }
+    });
+
+    socket.on('answerCall', ({ to, answer }) => {
+        const targetSocketId = onlineUsers.get(to);
+        if (targetSocketId) {
+            io.to(targetSocketId).emit('callAccepted', { answer });
+        }
+    });
+
+    socket.on('rejectCall', ({ to }) => {
+        const targetSocketId = onlineUsers.get(to);
+        if (targetSocketId) {
+            io.to(targetSocketId).emit('callRejected');
+        }
+    });
+
+    socket.on('iceCandidate', ({ to, candidate }) => {
+        const targetSocketId = onlineUsers.get(to);
+        if (targetSocketId) {
+            io.to(targetSocketId).emit('iceCandidate', { candidate });
+        }
+    });
+
+    socket.on('endCall', ({ to }) => {
+        const targetSocketId = onlineUsers.get(to);
+        if (targetSocketId) {
+            io.to(targetSocketId).emit('callEnded');
+        }
+    });
+
+    socket.on('disconnect', async () => {
         // Uzilgan foydalanuvchini ro'yxatdan olib tashlaymiz
         for (const [userId, socketId] of onlineUsers.entries()) {
             if (socketId === socket.id) {
                 onlineUsers.delete(userId);
+                try {
+                    await User.findByIdAndUpdate(userId, { lastSeen: new Date() });
+                } catch (error) {
+                    console.error("lastSeen yangilashda xatolik:", error.message);
+                }
                 break;
             }
         }
+        broadcastOnlineUsers();
     });
 });
 

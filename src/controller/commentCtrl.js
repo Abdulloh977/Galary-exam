@@ -40,6 +40,36 @@ const commentCtrl = {
         }
     },
 
+    // Izohni tahrirlash (Update) — faqat izoh egasi tahrirlay oladi
+    updateComment: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { text } = req.body;
+
+            if (!text || text.trim() === "") {
+                return res.status(400).json({ message: "Izoh matni bo'sh bo'lishi mumkin emas!" });
+            }
+
+            const comment = await Comment.findById(id);
+            if (!comment) {
+                return res.status(404).json({ message: "Izoh topilmadi!" });
+            }
+
+            if (comment.user.toString() !== req.user.id) {
+                return res.status(403).json({ message: "Siz faqat o'zingizning izohingizni tahrirlashingiz mumkin!" });
+            }
+
+            comment.text = text.trim();
+            await comment.save();
+
+            const populatedComment = await comment.populate("user", "username firstname lastname profilePicture");
+
+            res.status(200).json({ message: "Izoh yangilandi!", comment: populatedComment });
+        } catch (error) {
+            res.status(500).json({ message: error.message });
+        }
+    },
+
     // Izohni o'chirish (izoh egasi, rasm egasi yoki admin o'chira oladi)
     deleteComment: async (req, res) => {
         try {
@@ -56,6 +86,8 @@ const commentCtrl = {
 
             if (isCommentOwner || isPinOwner || req.userIsAdmin) {
                 await Comment.findByIdAndDelete(id);
+                // Agar bu asosiy izoh bo'lsa, unga yozilgan barcha javoblar ham o'chadi
+                await Comment.deleteMany({ parentComment: id });
                 return res.status(200).json({ message: "Izoh muvaffaqiyatli o'chirildi!" });
             } else {
                 return res.status(403).json({ message: "Sizda bu izohni o'chirish huquqi yo'q!" });

@@ -9,6 +9,8 @@ router.get('/users', authMiddleware, userCtrl.getAll);
 router.get('/oneUser/:id', authMiddleware, userCtrl.getOne);
 router.delete('/delete/:id', authMiddleware, userCtrl.deleteUser);
 router.put('/update/:id', authMiddleware,  userCtrl.updateUser);
+router.put('/block/:id', authMiddleware, userCtrl.blockUser);
+router.put('/unblock/:id', authMiddleware, userCtrl.unblockUser);
 
 
 export default router;  

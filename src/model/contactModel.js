@@ -1,33 +1,21 @@
 import mongoose from "mongoose";
 
-const chatSchema = new mongoose.Schema(
+const contactSchema = new mongoose.Schema(
     {
-        sender: {
+        owner: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
             required: true
         },
-        receiver: {
+        contact: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
             required: true
         },
-        text: {
+        nickname: {
             type: String,
             trim: true,
             default: ""
-        },
-        imageUrl: {
-            type: String,
-            default: ""
-        },
-        seen: {
-            type: Boolean,
-            default: false
-        },
-        edited: {
-            type: Boolean,
-            default: false
         }
     },
     {
@@ -35,4 +23,7 @@ const chatSchema = new mongoose.Schema(
     }
 );
 
-export default mongoose.model('Chat', chatSchema);
+// Bir foydalanuvchi bir kishini faqat bitta marta kontaktga saqlay oladi
+contactSchema.index({ owner: 1, contact: 1 }, { unique: true });
+
+export default mongoose.model('Contact', contactSchema);

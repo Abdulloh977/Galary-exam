@@ -44,6 +44,16 @@ const userSchema = new mongoose.Schema(
                 type: mongoose.Schema.Types.ObjectId,
                 ref: 'Board'
             }
+        ],
+        lastSeen: {
+            type: Date,
+            default: Date.now
+        },
+        blockedUsers: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'User'
+            }
         ]
     },
     {
