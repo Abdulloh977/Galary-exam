@@ -19,14 +19,11 @@ const pinCtrl = {
 
             const file = req.files.image;
 
-            // Fayl nomida kirill harflar yoki bo'shliq bo'lsa, brauzer so'rovni
-            // to'g'ri yubora olmasligi (ERR_BLOCKED_BY_CLIENT/404) mumkin edi.
-            // Shuning uchun faqat lotin harf/raqam/tire/pastki chiziqni qoldiramiz.
             const ext = path.extname(file.name);
             const baseName = path.basename(file.name, ext)
                 .normalize("NFKD")
-                .replace(/[\u0300-\u036f]/g, "") // diakritik belgilarni olib tashlash
-                .replace(/[^a-zA-Z0-9_-]+/g, "-") // lotin bo'lmagan (kirill va h.k.) belgilarni "-" bilan almashtirish
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/[^a-zA-Z0-9_-]+/g, "-")
                 .replace(/-+/g, "-")
                 .replace(/^-|-$/g, "");
 
@@ -46,8 +43,7 @@ const pinCtrl = {
                 description,
                 imageUrl: fileName,
                 tags: finalTags,
-                owner: req.user.id 
-                // owner: req.user.id
+                owner: req.user.id
             });
 
             res.status(201).json({ message: "Rasm muvaffaqiyatli yuklandi!", pin: newPin });
@@ -56,7 +52,6 @@ const pinCtrl = {
         }
     },
 
-    // Qidiruv — sarlavha (title) yoki teglar (tags) bo'yicha
     searchPins: async (req, res) => {
         try {
             const { query } = req.query;
@@ -80,17 +75,16 @@ const pinCtrl = {
         }
     },
 
-    // Barcha rasmlarni olish (Bosh sahifa uchun)
     getAllPins: async (req, res) => {
         try {
-            const pins = await Pin.find().populate("owner", "username firstname lastname profilePicture");
+            const pins = await Pin.find({ isPrivate: { $ne: true } })
+                .populate("owner", "username firstname lastname profilePicture");
             res.status(200).json({ pins });
         } catch (error) {
             res.status(500).json({ message: error.message });
         }
     },
 
-    // Bitta rasmni to'liq ko'rish (ID bo'yicha) — har safar ochilganda views +1 bo'ladi
     getOnePin: async (req, res) => {
         try {
             const { id } = req.params;
@@ -111,10 +105,12 @@ const pinCtrl = {
         }
     },
 
-    // Eng mashhur (Top Popular) rasmlarni olish — views + likes soni bo'yicha saralanadi
     getTopPins: async (req, res) => {
         try {
             const pins = await Pin.aggregate([
+                {
+                    $match: { isPrivate: { $ne: true } }
+                },
                 {
                     $addFields: {
                         likesCount: { $size: "$likes" },
@@ -139,6 +135,7 @@ const pinCtrl = {
                         imageUrl: 1,
                         tags: 1,
                         views: 1,
+                        likes: 1,
                         likesCount: 1,
                         popularityScore: 1,
                         createdAt: 1,
@@ -156,7 +153,6 @@ const pinCtrl = {
         }
     },
 
-    // Rasmni o'chirish (Faqat egasi yoki admin o'chira oladi)
     deletePin: async (req, res) => {
         try {
             const { id } = req.params;
@@ -174,10 +170,8 @@ const pinCtrl = {
 
                 await Pin.findByIdAndDelete(id);
 
-                // Rasm o'chirilganda unga tegishli barcha izohlar ham o'chadi
                 await Comment.deleteMany({ pin: id });
 
-                // Rasm o'chirilganda barcha category (board)lardan ham olib tashlanadi
                 await Board.updateMany({ pins: id }, { $pull: { pins: id } });
 
                 return res.status(200).json({ message: "Rasm muvaffaqiyatli o'chirildi!" });
@@ -208,6 +202,30 @@ const pinCtrl = {
 
             await pin.save();
             res.status(200).json({ message: isLiked ? "Layk olib tashlandi" : "Layk bosildi", likesCount: pin.likes.length });
+        } catch (error) {
+            res.status(500).json({ message: error.message });
+        }
+    },
+
+    updatePin: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { isPrivate } = req.body;
+
+            const pin = await Pin.findById(id);
+
+            if (!pin) {
+                return res.status(404).json({ message: "Rasm topilmadi!" });
+            }
+
+            if (pin.owner.toString() !== req.user.id) {
+                return res.status(403).json({ message: "Sizda bu rasmni yashirish huquqi yo'q!" });
+            }
+
+            pin.isPrivate = isPrivate;
+            await pin.save();
+
+            res.status(200).json({ message: "Rasm holati muvaffaqiyatli yangilandi", pin });
         } catch (error) {
             res.status(500).json({ message: error.message });
         }
