@@ -75,10 +75,15 @@ const pinCtrl = {
         }
     },
 
+    // 💡 TUZATILDI: Bosh sahifaga faqat isPrivate: true BO'LMAGAN rasmlarni qat'iy chiqarish
     getAllPins: async (req, res) => {
         try {
-            const pins = await Pin.find({ isPrivate: { $ne: true } })
-                .populate("owner", "username firstname lastname profilePicture");
+            const pins = await Pin.find({
+                $or: [
+                    { isPrivate: false },
+                    { isPrivate: { $exists: false } }
+                ]
+            }).populate("owner", "username firstname lastname profilePicture");
             res.status(200).json({ pins });
         } catch (error) {
             res.status(500).json({ message: error.message });
@@ -105,11 +110,17 @@ const pinCtrl = {
         }
     },
 
+    // 💡 TUZATILDI: Top Popular bo'limida ham shaxsiy rasmlarni qat'iy chetlatish filtri
     getTopPins: async (req, res) => {
         try {
             const pins = await Pin.aggregate([
                 {
-                    $match: { isPrivate: { $ne: true } }
+                    $match: {
+                        $or: [
+                            { isPrivate: false },
+                            { isPrivate: { $exists: false } }
+                        ]
+                    }
                 },
                 {
                     $addFields: {
@@ -169,9 +180,7 @@ const pinCtrl = {
                 }
 
                 await Pin.findByIdAndDelete(id);
-
                 await Comment.deleteMany({ pin: id });
-
                 await Board.updateMany({ pins: id }, { $pull: { pins: id } });
 
                 return res.status(200).json({ message: "Rasm muvaffaqiyatli o'chirildi!" });
