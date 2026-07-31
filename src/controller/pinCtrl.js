@@ -1,8 +1,32 @@
 import Pin from "../model/pinModel.js";
 import Comment from "../model/commentModel.js";
 import Board from "../model/boardModel.js";
-import fs from "fs";
-import path from "path";
+import axios from "axios";
+import FormData from "form-data";
+
+const uploadImageToImgBB = async (file) => {
+    try {
+        const form = new FormData();
+        // express-fileupload orqali kelgan fayl bufferini base64 formatiga o'tkazamiz
+        form.append("image", file.data.toString("base64"));
+
+        // O'zingizning haqiqiy ImgBB API kalitingizni shu yerga qo'ying:
+        const IMGBB_API_KEY = "YOUR_IMGBB_API_KEY_HERE"; 
+
+        const response = await axios.post(`https://imgbb.com{IMGBB_API_KEY}`, form, {
+            headers: form.getHeaders(),
+        });
+
+        if (response.data && response.data.success) {
+            return response.data.data.url; // Bu umrbod o'chmaydigan to'liq link (https://ibb.co...)
+        } else {
+            throw new Error("ImgBB yuklashda xatolik berdi");
+        }
+    } catch (error) {
+        console.error("ImgBB xatoligi:", error.message);
+        throw new Error("Rasmni saqlash omboriga yuklashda xatolik bo'ldi.");
+    }
+};
 
 const pinCtrl = {
     createPin: async (req, res) => {
@@ -19,29 +43,19 @@ const pinCtrl = {
 
             const file = req.files.image;
 
-            const ext = path.extname(file.name);
-            const baseName = path.basename(file.name, ext)
-                .normalize("NFKD")
-                .replace(/[\u0300-\u036f]/g, "")
-                .replace(/[^a-zA-Z0-9_-]+/g, "-")
-                .replace(/-+/g, "-")
-                .replace(/^-|-$/g, "");
-
-            const safeName = baseName ? `${baseName}${ext}` : `image${ext}`;
-            const fileName = `${Date.now()}_${safeName}`;
-            const uploadPath = path.join("src", "public", fileName);
-
-            await file.mv(uploadPath);
+            // 💡 TUZATILDI: Local serverga saqlash (file.mv) o'rniga ImgBB cloud'ga yuklaymiz
+            const permanentImageUrl = await uploadImageToImgBB(file);
 
             let finalTags = [];
             if (tags) {
                 finalTags = Array.isArray(tags) ? tags : tags.split(",").map(t => t.trim());
             }
 
+            // 💡 TUZATILDI: imageUrl qismiga endi fayl nomi emas, to'liq o'chmas havola saqlanadi
             const newPin = await Pin.create({
                 title,
                 description,
-                imageUrl: fileName,
+                imageUrl: permanentImageUrl, 
                 tags: finalTags,
                 owner: req.user.id
             });
@@ -75,7 +89,6 @@ const pinCtrl = {
         }
     },
 
-    // 💡 TUZATILDI: Bosh sahifaga faqat isPrivate: true BO'LMAGAN rasmlarni qat'iy chiqarish
     getAllPins: async (req, res) => {
         try {
             const pins = await Pin.find({
@@ -110,7 +123,6 @@ const pinCtrl = {
         }
     },
 
-    // 💡 TUZATILDI: Top Popular bo'limida ham shaxsiy rasmlarni qat'iy chetlatish filtri
     getTopPins: async (req, res) => {
         try {
             const pins = await Pin.aggregate([
@@ -174,11 +186,7 @@ const pinCtrl = {
             }
 
             if (pin.owner.toString() === req.user.id || req.userIsAdmin) {
-                const imgPath = path.join("src", "public", pin.imageUrl);
-                if (fs.existsSync(imgPath)) {
-                    fs.unlinkSync(imgPath);
-                }
-
+                // 💡 TUZATILDI: Mahalliy Render xotirasidan (fs.unlink) o'chirish keraksiz bo'lgani uchun olib tashlandi
                 await Pin.findByIdAndDelete(id);
                 await Comment.deleteMany({ pin: id });
                 await Board.updateMany({ pins: id }, { $pull: { pins: id } });

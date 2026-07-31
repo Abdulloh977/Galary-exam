@@ -25,7 +25,10 @@ router.delete('/pin/delete/:id', authMiddleware, pinCtrl.deletePin);
 // Layk bosish / olib tashlash — token kerak
 router.put('/pin/like/:id', authMiddleware, pinCtrl.likePin);
 
-router.put('/pin/update/:id', authMiddleware, pinCtrl.updatePin); 
+
+// Yangi pin yaratish rutasi
+router.post("/create", authMiddleware, pinCtrl.createPin);
+
 
 
 
