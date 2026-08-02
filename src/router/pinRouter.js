@@ -17,7 +17,7 @@ router.get('/pin/top', pinCtrl.getTopPins);
 router.get('/pin/search', pinCtrl.searchPins);
 
 // Bitta rasmni ko'rish — token kerak emas
-router.get('/pin/one/:id', pinCtrl.getOnePin);
+router.get('/pin/one/:id', authMiddleware, pinCtrl.getOnePin);
 
 // Rasmni o'chirish — token kerak (faqat egasi yoki admin)
 router.delete('/pin/delete/:id', authMiddleware, pinCtrl.deletePin);

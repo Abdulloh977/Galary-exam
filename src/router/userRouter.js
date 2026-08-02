@@ -6,7 +6,6 @@ import optionalAuth from '../authMiddleware/optionalAuth.js';
 const router = express.Router();
 
 router.get('/profile/:id', optionalAuth, userCtrl.getProfile);
-
 router.get('/users', authMiddleware, userCtrl.getAll);
 router.get('/oneUser/:id', authMiddleware, userCtrl.getOne);
 router.delete('/delete/:id', authMiddleware, userCtrl.deleteUser);

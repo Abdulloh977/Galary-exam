@@ -7,31 +7,48 @@ import { uploadToCloudinary } from "../utils/cloudinary.js";
 
 const userCtrl = {
     getProfile: async (req, res) => {
-        try {
-            const { id } = req.params;
+    try {
+        const { id } = req.params;
 
-            const user = await User.findById(id).select("-password").populate("savedBoards");
-            if (!user) {
-                return res.status(404).json({ message: "User not found!" });
-            }
+        const user = await User.findById(id)
+            .select("-password")
+            .populate("savedBoards");
 
-            const isOwner = !!(req.user && req.user.id === id);
-
-            const userPins = await Pin.find({ owner: id });
-
-            const userBoards = isOwner ? await Board.find({ owner: id }) : [];
-
-            res.status(200).json({
-                message: "Profile data fetched successfully!",
-                user,
-                pins: userPins,
-                boards: userBoards
+        if (!user) {
+            return res.status(404).json({
+                message: "User not found!"
             });
-        } catch (error) {
-            console.error(error);
-            res.status(500).json({ message: error.message });
         }
-    },
+
+        // Profil egasimi?
+        const isOwner =
+            req.user &&
+            req.user.id &&
+            req.user.id.toString() === id.toString();
+
+        let userPins = [];
+        let userBoards = [];
+
+        // Faqat profil egasi ko'radi
+        if (isOwner) {
+            userPins = await Pin.find({ owner: id });
+            userBoards = await Board.find({ owner: id });
+        }
+
+        res.status(200).json({
+            message: "Profile data fetched successfully!",
+            user,
+            pins: userPins,
+            boards: userBoards
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            message: error.message
+        });
+    }
+},
 
     getAll: async (req, res) => {
         try {
