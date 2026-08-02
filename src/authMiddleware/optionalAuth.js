@@ -1,26 +1,25 @@
-import dotenv from 'dotenv'
-import JWT from 'jsonwebtoken'
+import dotenv from 'dotenv';
+import JWT from 'jsonwebtoken';
 
-dotenv.config()
+dotenv.config();
 
-const JWT_SECRET_KEY = process.env.JWT_SECRET_KEY
+const JWT_SECRET_KEY = process.env.JWT_SECRET_KEY;
 
 const optionalAuth = (req, res, next) => {
     try {
         let token = req.headers.token || req.headers.authorization;
 
-        if (token && token.startsWith('Bearer ')) {
-            token = token.split(' ')[1];
+        if (token && token.startsWith("Bearer ")) {
+            token = token.split(" ")[1];
         }
 
         if (token) {
-            const decodeUser = JWT.verify(token, JWT_SECRET_KEY);
-            req.user = decodeUser;
+            const decoded = JWT.verify(token, JWT_SECRET_KEY);
+            req.user = decoded;
         }
-    } catch (error) {
-    }
+    } catch (err) {}
 
     next();
-}
+};
 
 export default optionalAuth;
