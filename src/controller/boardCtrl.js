@@ -2,7 +2,7 @@ import Board from "../model/boardModel.js";
 import User from "../model/userModel.js";
 
 const boardCtrl = {
-    // Yangi doska yaratish
+
     createBoard: async (req, res) => {
         try {
             const { title } = req.body;
@@ -21,7 +21,6 @@ const boardCtrl = {
         }
     },
 
-    // Foydalanuvchining o'ziga tegishli barcha doskalarini olish
     getMyBoards: async (req, res) => {
         try {
             const boards = await Board.find({ owner: req.user.id }).populate("pins");
@@ -31,7 +30,6 @@ const boardCtrl = {
         }
     },
 
-    // Bitta doska ichidagi barcha Pin (rasm)lari bilan birga ko'rish
     getOneBoard: async (req, res) => {
         try {
             const { id } = req.params;
@@ -41,13 +39,16 @@ const boardCtrl = {
                 return res.status(404).json({ message: "Board topilmadi!" });
             }
 
+            if (board.owner.toString() !== req.user.id) {
+                return res.status(403).json({ message: "Bu kategoriya sizga tegishli emas!" });
+            }
+
             res.status(200).json({ board });
         } catch (error) {
             res.status(500).json({ message: error.message });
         }
     },
 
-    // Doska nomini yangilash (Update)
     updateBoard: async (req, res) => {
         try {
             const { id } = req.params;
@@ -73,7 +74,6 @@ const boardCtrl = {
         }
     },
 
-    // Doskani o'chirish (Delete) — ichidagi pinlar o'chmaydi, faqat doskaning o'zi o'chadi
     deleteBoard: async (req, res) => {
         try {
             const { id } = req.params;
@@ -92,7 +92,6 @@ const boardCtrl = {
         }
     },
 
-    // Doskaga rasm (Pin) qo'shish yoki undan olib tashlash (Toggle Pin)
     addPinToBoard: async (req, res) => {
         try {
             const { boardId, pinId } = req.body;
@@ -119,7 +118,6 @@ const boardCtrl = {
         }
     },
 
-    // Boshqa birovning doskasini o'ziga saqlab qo'yish (SavedBoards tizimi)
     saveBoardToUser: async (req, res) => {
         try {
             const { boardId } = req.params;

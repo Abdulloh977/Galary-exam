@@ -3,8 +3,7 @@ import Pin from "../model/pinModel.js";
 import Board from "../model/boardModel.js";
 import Comment from "../model/commentModel.js";
 import bcrypt from "bcrypt";
-import fs from "fs";
-import path from 'path';
+import { uploadToCloudinary } from "../utils/cloudinary.js";
 
 const userCtrl = {
     getProfile: async (req, res) => {
@@ -16,8 +15,11 @@ const userCtrl = {
                 return res.status(404).json({ message: "User not found!" });
             }
 
+            const isOwner = !!(req.user && req.user.id === id);
+
             const userPins = await Pin.find({ owner: id });
-            const userBoards = await Board.find({ owner: id });
+
+            const userBoards = isOwner ? await Board.find({ owner: id }) : [];
 
             res.status(200).json({
                 message: "Profile data fetched successfully!",
@@ -47,7 +49,7 @@ const userCtrl = {
             const user = await User.findById(id).select("-password");
 
             if (!user) {
-                return res.status(404).json({ message: "User not found!" });                
+                return res.status(404).json({ message: "User not found!" });
             }
             res.status(200).json({ message: "Found user!", user });
         } catch (error) {
@@ -59,41 +61,24 @@ const userCtrl = {
     deleteUser: async (req, res) => {
         try {
             const { id } = req.params;
-            
-            if (id === req.user.id || req.userIsAdmin) {
-                
-                const user = await User.findByIdAndDelete(id);
-    
-                if (!user) {
-                    return res.status(404).json({ message: "User not found!" });                
-                }
 
-                if (user.profilePicture && user.profilePicture !== '') {
-                    const oldPath = path.join('src', 'public', user.profilePicture);
-                    if (fs.existsSync(oldPath)) {
-                        fs.unlinkSync(oldPath);
-                    }
+            if (id === req.user.id || req.userIsAdmin) {
+
+                const user = await User.findByIdAndDelete(id);
+
+                if (!user) {
+                    return res.status(404).json({ message: "User not found!" });
                 }
 
                 const userPins = await Pin.find({ owner: id });
                 const pinIds = userPins.map(pin => pin._id);
 
-                userPins.forEach(pin => {
-                    const pinPath = path.join('src', 'public', pin.imageUrl);
-                    if (fs.existsSync(pinPath)) {
-                        fs.unlinkSync(pinPath);
-                    }
-                });
-
-                // Foydalanuvchining o'z rasmlariga yozilgan barcha izohlar (boshqalarniki ham)
                 await Comment.deleteMany({ pin: { $in: pinIds } });
-                // Foydalanuvchining o'zi boshqa rasmlarga yozgan izohlari
+
                 await Comment.deleteMany({ user: id });
 
-                // O'chirilgan rasmlarni boshqa userlarning category (board)laridan ham olib tashlaymiz
                 await Board.updateMany({ pins: { $in: pinIds } }, { $pull: { pins: { $in: pinIds } } });
 
-                // Foydalanuvchi boshqa rasmlarga bosgan layklarni ham tozalaymiz
                 await Pin.updateMany({ likes: id }, { $pull: { likes: id } });
 
                 await Pin.deleteMany({ owner: id });
@@ -111,7 +96,7 @@ const userCtrl = {
 
     blockUser: async (req, res) => {
         try {
-            const { id } = req.params; // bloklanadigan foydalanuvchi
+            const { id } = req.params;
             const myId = req.user.id;
 
             if (id === myId) {
@@ -143,7 +128,7 @@ const userCtrl = {
         try {
             const { id } = req.params;
             const { firstname, lastname, email, password, username } = req.body || {};
-            
+
             const user = await User.findById(id);
             if (!user) {
                 return res.status(404).json({ message: "User not found!" });
@@ -152,36 +137,15 @@ const userCtrl = {
             if (req.files && req.files.profilePicture) {
                 const file = req.files.profilePicture;
 
-                // Rasm nomi kirill/bo'shliq bo'lsa brauzer so'rovi bloklanishi mumkin edi —
-                // shuning uchun fayl nomini lotin/raqamli xavfsiz shaklga o'tkazamiz
-                const ext = path.extname(file.name);
-                const baseName = path.basename(file.name, ext)
-                    .normalize("NFKD")
-                    .replace(/[\u0300-\u036f]/g, "")
-                    .replace(/[^a-zA-Z0-9_-]+/g, "-")
-                    .replace(/-+/g, "-")
-                    .replace(/^-|-$/g, "");
-                const safeName = baseName ? `${baseName}${ext}` : `avatar${ext}`;
-
-                const fileName = `${Date.now()}_${safeName}`;
-                const uploadPath = path.join('src', 'public', fileName);
-
-                if (user.profilePicture && user.profilePicture !== '') {
-                    const oldPath = path.join('src', 'public', user.profilePicture); 
-                    if (fs.existsSync(oldPath)) { 
-                        fs.unlinkSync(oldPath);
-                    }
-                }
-
-                await file.mv(uploadPath);
-                user.profilePicture = fileName;
+                const permanentImageUrl = await uploadToCloudinary(file, "gallery-app/avatars");
+                user.profilePicture = permanentImageUrl;
             }
 
             if (firstname) user.firstname = firstname;
             if (lastname) user.lastname = lastname;
             if (username) user.username = username;
             if (email) user.email = email;
-            
+
             if (password) {
                 user.password = await bcrypt.hash(password, 10);
             }
@@ -189,9 +153,9 @@ const userCtrl = {
             const updatedUser = await user.save();
             updatedUser.password = undefined;
 
-            res.status(200).json({ 
-                message: "User updated successfully!", 
-                user: updatedUser 
+            res.status(200).json({
+                message: "User updated successfully!",
+                user: updatedUser
             });
 
         } catch (error) {
