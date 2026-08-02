@@ -20,21 +20,27 @@ const userCtrl = {
                 });
             }
 
-            const isOwner =
-                req.user &&
-                req.user.id &&
-                req.user.id.toString() === id.toString();
+            let isOwner = false;
+
+            if (req.user) {
+                isOwner = req.user.id.toString() === id.toString();
+            }
 
             let pins = [];
             let boards = [];
 
             if (isOwner) {
                 pins = await Pin.find({ owner: id });
-                boards = await Board.find({ owner: id }).populate("pins");
+            } else {
+                pins = await Pin.find({
+                    owner: id,
+                    isPrivate: false,
+                });
             }
 
-            return res.status(200).json({
-                message: "Profile loaded",
+            boards = await Board.find({ owner: id }).populate("pins");
+
+            res.status(200).json({
                 user,
                 pins,
                 boards,
@@ -42,8 +48,7 @@ const userCtrl = {
             });
 
         } catch (error) {
-            console.log(error);
-            return res.status(500).json({
+            res.status(500).json({
                 message: error.message
             });
         }
