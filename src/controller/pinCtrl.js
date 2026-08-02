@@ -11,11 +11,15 @@ const uploadImageToImgBB = async (file) => {
         form.append("image", file.data.toString("base64"));
 
         // O'zingizning haqiqiy ImgBB API kalitingizni shu yerga qo'ying:
-        const IMGBB_API_KEY = "YOUR_IMGBB_API_KEY_HERE"; 
+        const IMGBB_API_KEY = process.env.IMGBB_API_KEY;
 
-        const response = await axios.post(`https://imgbb.com{IMGBB_API_KEY}`, form, {
-            headers: form.getHeaders(),
-        });
+        const response = await axios.post(
+            `https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`,
+            form,
+            {
+                headers: form.getHeaders(),
+            }
+        );
 
         if (response.data && response.data.success) {
             return response.data.data.url; // Bu umrbod o'chmaydigan to'liq link (https://ibb.co...)
@@ -55,7 +59,7 @@ const pinCtrl = {
             const newPin = await Pin.create({
                 title,
                 description,
-                imageUrl: permanentImageUrl, 
+                imageUrl: permanentImageUrl,
                 tags: finalTags,
                 owner: req.user.id
             });
@@ -117,7 +121,14 @@ const pinCtrl = {
                 return res.status(404).json({ message: "Rasm topilmadi!" });
             }
 
+            if (pin.isPrivate && pin.owner._id.toString() !== req.user.id) {
+                return res.status(403).json({
+                    message: "Bu rasm private."
+                });
+            }
+
             res.status(200).json({ pin });
+
         } catch (error) {
             res.status(500).json({ message: error.message });
         }

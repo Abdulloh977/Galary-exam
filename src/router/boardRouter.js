@@ -8,7 +8,7 @@ router.post('/board/create', authMiddleware, boardCtrl.createBoard);
 
 router.get('/board/my', authMiddleware, boardCtrl.getMyBoards);
 
-router.get('/board/one/:id', boardCtrl.getOneBoard);
+router.get('/board/one/:id', authMiddleware, boardCtrl.getOneBoard);
 
 router.put('/board/update/:id', authMiddleware, boardCtrl.updateBoard);
 
