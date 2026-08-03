@@ -1,36 +1,7 @@
 import Pin from "../model/pinModel.js";
 import Comment from "../model/commentModel.js";
 import Board from "../model/boardModel.js";
-import axios from "axios";
-import FormData from "form-data";
-
-const uploadImageToImgBB = async (file) => {
-    try {
-        const form = new FormData();
-        // express-fileupload orqali kelgan fayl bufferini base64 formatiga o'tkazamiz
-        form.append("image", file.data.toString("base64"));
-
-        // O'zingizning haqiqiy ImgBB API kalitingizni shu yerga qo'ying:
-        const IMGBB_API_KEY = process.env.IMGBB_API_KEY;
-
-        const response = await axios.post(
-            `https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`,
-            form,
-            {
-                headers: form.getHeaders(),
-            }
-        );
-
-        if (response.data && response.data.success) {
-            return response.data.data.url; // Bu umrbod o'chmaydigan to'liq link (https://ibb.co...)
-        } else {
-            throw new Error("ImgBB yuklashda xatolik berdi");
-        }
-    } catch (error) {
-        console.error("ImgBB xatoligi:", error.message);
-        throw new Error("Rasmni saqlash omboriga yuklashda xatolik bo'ldi.");
-    }
-};
+import { uploadToImgBB } from "../utils/imgbb.js";
 
 const pinCtrl = {
     createPin: async (req, res) => {
@@ -47,15 +18,13 @@ const pinCtrl = {
 
             const file = req.files.image;
 
-            // 💡 TUZATILDI: Local serverga saqlash (file.mv) o'rniga ImgBB cloud'ga yuklaymiz
-            const permanentImageUrl = await uploadImageToImgBB(file);
+            const permanentImageUrl = await uploadToImgBB(file);
 
             let finalTags = [];
             if (tags) {
                 finalTags = Array.isArray(tags) ? tags : tags.split(",").map(t => t.trim());
             }
 
-            // 💡 TUZATILDI: imageUrl qismiga endi fayl nomi emas, to'liq o'chmas havola saqlanadi
             const newPin = await Pin.create({
                 title,
                 description,
@@ -121,14 +90,7 @@ const pinCtrl = {
                 return res.status(404).json({ message: "Rasm topilmadi!" });
             }
 
-            if (pin.isPrivate && pin.owner._id.toString() !== req.user.id) {
-                return res.status(403).json({
-                    message: "Bu rasm private."
-                });
-            }
-
             res.status(200).json({ pin });
-
         } catch (error) {
             res.status(500).json({ message: error.message });
         }
@@ -197,7 +159,7 @@ const pinCtrl = {
             }
 
             if (pin.owner.toString() === req.user.id || req.userIsAdmin) {
-                // 💡 TUZATILDI: Mahalliy Render xotirasidan (fs.unlink) o'chirish keraksiz bo'lgani uchun olib tashlandi
+
                 await Pin.findByIdAndDelete(id);
                 await Comment.deleteMany({ pin: id });
                 await Board.updateMany({ pins: id }, { $pull: { pins: id } });

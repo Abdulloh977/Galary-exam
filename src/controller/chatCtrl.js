@@ -1,10 +1,9 @@
 import Chat from "../model/chatModel.js";
 import User from "../model/userModel.js";
-import fs from "fs";
-import path from "path";
+import { uploadToImgBB } from "../utils/imgbb.js";
 
 const chatCtrl = {
-    // Xabar yuborish (REST orqali, zaxira sifatida — asosiysi Socket.io orqali ishlaydi)
+
     sendMessage: async (req, res) => {
         try {
             const { receiverId, text } = req.body;
@@ -25,7 +24,6 @@ const chatCtrl = {
         }
     },
 
-    // Rasm (fayl) orqali xabar yuborish
     sendImageMessage: async (req, res) => {
         try {
             const { receiverId, text } = req.body;
@@ -53,27 +51,15 @@ const chatCtrl = {
 
             const file = req.files.image;
 
-            const ext = path.extname(file.name);
-            const baseName = path.basename(file.name, ext)
-                .normalize("NFKD")
-                .replace(/[\u0300-\u036f]/g, "")
-                .replace(/[^a-zA-Z0-9_-]+/g, "-")
-                .replace(/-+/g, "-")
-                .replace(/^-|-$/g, "");
-            const safeName = baseName ? `${baseName}${ext}` : `chat-image${ext}`;
-
-            const fileName = `${Date.now()}_${safeName}`;
-            const uploadPath = path.join("src", "public", fileName);
-            await file.mv(uploadPath);
+            const permanentImageUrl = await uploadToImgBB(file);
 
             const newMessage = await Chat.create({
                 sender: req.user.id,
                 receiver: receiverId,
                 text: text || "",
-                imageUrl: fileName
+                imageUrl: permanentImageUrl
             });
 
-            // Agar qabul qiluvchi onlayn bo'lsa, real vaqtda darhol yetkazamiz
             const io = req.app.get("io");
             const onlineUsers = req.app.get("onlineUsers");
             if (io && onlineUsers) {
@@ -89,7 +75,6 @@ const chatCtrl = {
         }
     },
 
-    // Xabarni tahrirlash — faqat yuboruvchi tahrirlay oladi, faqat matnli xabarlar uchun
     updateMessage: async (req, res) => {
         try {
             const { id } = req.params;
@@ -112,7 +97,6 @@ const chatCtrl = {
             message.edited = true;
             await message.save();
 
-            // Qabul qiluvchi onlayn bo'lsa, unga ham real vaqtda bildiramiz
             const io = req.app.get("io");
             const onlineUsers = req.app.get("onlineUsers");
             if (io && onlineUsers) {
@@ -128,7 +112,6 @@ const chatCtrl = {
         }
     },
 
-    // Xabarni o'chirish — faqat yuboruvchi o'chira oladi
     deleteMessage: async (req, res) => {
         try {
             const { id } = req.params;
@@ -142,17 +125,9 @@ const chatCtrl = {
                 return res.status(403).json({ message: "Siz faqat o'zingiz yuborgan xabarni o'chira olasiz!" });
             }
 
-            if (message.imageUrl) {
-                const imgPath = path.join("src", "public", message.imageUrl);
-                if (fs.existsSync(imgPath)) {
-                    fs.unlinkSync(imgPath);
-                }
-            }
-
             const receiverId = message.receiver.toString();
             await Chat.findByIdAndDelete(id);
 
-            // Qabul qiluvchi onlayn bo'lsa, unga ham real vaqtda bildiramiz
             const io = req.app.get("io");
             const onlineUsers = req.app.get("onlineUsers");
             if (io && onlineUsers) {
@@ -167,8 +142,7 @@ const chatCtrl = {
             res.status(500).json({ message: error.message });
         }
     },
-    
-    // Ikki foydalanuvchi orasidagi suhbat tarixini olish
+
     getConversation: async (req, res) => {
         try {
             const myId = req.user.id;
@@ -187,8 +161,6 @@ const chatCtrl = {
         }
     },
 
-
-    // Foydalanuvchining barcha suhbatdoshlari ro'yxati (chap paneldagi chat ro'yxati uchun)
     getConversationsList: async (req, res) => {
         try {
             const myId = req.user.id;

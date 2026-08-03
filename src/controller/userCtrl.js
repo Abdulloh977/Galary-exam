@@ -3,54 +3,33 @@ import Pin from "../model/pinModel.js";
 import Board from "../model/boardModel.js";
 import Comment from "../model/commentModel.js";
 import bcrypt from "bcrypt";
-import { uploadToCloudinary } from "../utils/cloudinary.js";
+import { uploadToImgBB } from "../utils/imgbb.js";
 
 const userCtrl = {
     getProfile: async (req, res) => {
         try {
             const { id } = req.params;
 
-            const user = await User.findById(id)
-                .select("-password")
-                .populate("savedBoards");
-
+            const user = await User.findById(id).select("-password").populate("savedBoards");
             if (!user) {
-                return res.status(404).json({
-                    message: "User not found!"
-                });
+                return res.status(404).json({ message: "User not found!" });
             }
 
-            let isOwner = false;
+            const isOwner = !!(req.user && req.user.id === id);
 
-            if (req.user) {
-                isOwner = req.user.id.toString() === id.toString();
-            }
+            const userPins = await Pin.find({ owner: id });
 
-            let pins = [];
-            let boards = [];
-
-            if (isOwner) {
-                pins = await Pin.find({ owner: id });
-            } else {
-                pins = await Pin.find({
-                    owner: id,
-                    isPrivate: false,
-                });
-            }
-
-            boards = await Board.find({ owner: id }).populate("pins");
+            const userBoards = isOwner ? await Board.find({ owner: id }) : [];
 
             res.status(200).json({
+                message: "Profile data fetched successfully!",
                 user,
-                pins,
-                boards,
-                isOwner
+                pins: userPins,
+                boards: userBoards
             });
-
         } catch (error) {
-            res.status(500).json({
-                message: error.message
-            });
+            console.error(error);
+            res.status(500).json({ message: error.message });
         }
     },
 
@@ -158,7 +137,7 @@ const userCtrl = {
             if (req.files && req.files.profilePicture) {
                 const file = req.files.profilePicture;
 
-                const permanentImageUrl = await uploadToCloudinary(file, "gallery-app/avatars");
+                const permanentImageUrl = await uploadToImgBB(file);
                 user.profilePicture = permanentImageUrl;
             }
 
